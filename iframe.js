@@ -6,7 +6,6 @@
  * @target MZ
  * @plugindesc Shows/hides a separate webpage using an iframe.
  * @author jakubiszon
- * @requiredAssets html/*.*
  *
  * @param debugMode
  * @text debugMode
@@ -17,9 +16,10 @@
  * @help iframe.js
  *
  * This plugin allows showing other web-pages in an iframe over the game.
- * Use the "show" command with a single param soecifying the page url.
+ * Use the "show" command with a single param specifying the page url.
  * To close the frame the game needs to call the "hide" command.
- * To know when to close the page - the page can call the window.iframeCallback()
+ * To know when to close the page - the plugin can setup a callback or
+ * watch for updates in iframe data.
  *
  * TODO (PRs welcome! https://github.com)
  * 1. Watching data is not yet implemented
