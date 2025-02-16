@@ -5,7 +5,7 @@ This plugin allows:
 2. receiving callbacks triggered by the page
 3. reacting to state changes in the page
 
-[Live Demo](http://example.com) with PICO-8 and Pocket Platformer.
+[Demo game with PICO-8 and Pocket Platformer.](https://jakubiszon.github.io/rpg-maker-mz-iframe/)
 
 ## Plugin Commands
 
@@ -30,9 +30,33 @@ The problem can be mitigated with:
 
 If you know of a better workaround - let me know. Or maybe open a PR :D
 
+<!-- ## Example Setup
+
+|*Example event setup*|
+|:---:|
+|![event](./img/Screenshot%202025-02-14%20014554.png)| -->
+
+
+
 ## Integrating with Pocket Platformer
 You will need to use [Pocket Platformer integration fork](https://jakubiszon.github.io/pocket-platformer/).
-If you already have a game you want to use - you only need to import it and export using.
+If you already have a game you want to use - you only need to import it and export using it.
+
+```js
+// Callback parameters to use:
+callbackPath: "gameEventCallback"
+(other values can be set as you need them)
+
+// If you specify the outputVariable it will be assigned JSON
+// with an array containing a single object, example:
+'[{"eventName": "level-completed", "nextLevelindex": 2}]'
+
+// In the common event launched by the plugin you can include an if script value
+JSON.parse($gameVariables( <variable> ))[0].eventName === "level-completed"
+
+// if you would like to apply different results depending on nextLevelindex do:
+JSON.parse($gameVariables( <variable> ))[0].nextLevelindex == <number>
+```
 
 
 ## Integrating with PICO-8
@@ -40,11 +64,34 @@ If you already have a game you want to use - you only need to import it and expo
 You will need to export your pico cartridge as a html page.
 For the moment only the js (no WASM) version was tested.
 
-In order for a PICO-8 card to pass data to javascript it needs to
-call the `poke` function for address range 
+In order for a PICO-8 program to pass data to javascript it needs to
+call the `poke` function for any of the 128 bytes starting at `0X5F80` address.  Each of these bytes represents a single value of a variable `pivo8_pgio` which is visible inside the webpage running PICO-8.
 
-Also make sure your exported `.html` page has the following setting:
+As far as I know, there are no callbacks emitted from the PICO-8 page.
+Setting up the plugin can rely on `watchPath` instead.
+
+Watching all 128 I/O "pins":
+```js
+// Callback parameters to use:
+watchPath: "pico8_gpio"
+(other values can be set as you need them)
+
+// in the scripts you can use JSON.parse to get the entire array:
+JSON.parse($gameVariables( <variable> ))[0] // returns Array[number]
+```
+
+Watching a single I/O "pin":
+```js
+// to watch a single number:
+watchPath: "pico8_gpio/0" // will watch the very first pin
+
+// other values can be set as you need them
+
+// in the scripts you can use JSON.parse to get value of that single "pin":
+JSON.parse($gameVariables( <variable> ))[0] // returns a number
+```
+
+Also it is recommended to set exported `.html` to start the game automatically:
 ```
 var p8_autoplay = true;
 ```
-
