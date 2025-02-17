@@ -7,6 +7,10 @@ This plugin allows:
 
 [Demo game with PICO-8 and Pocket Platformer.](https://jakubiszon.github.io/rpg-maker-mz-iframe/)
 
+| *Demo Preview* |
+|:---:|
+|![](./img/preview.gif)|
+
 This program is shared under the [GNU GENERAL PUBLIC LICENSE](./LICENSE.md)
 
 ## Plugin Commands
