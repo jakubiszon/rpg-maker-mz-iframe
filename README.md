@@ -7,6 +7,8 @@ This plugin allows:
 
 [Demo game with PICO-8 and Pocket Platformer.](https://jakubiszon.github.io/rpg-maker-mz-iframe/)
 
+This program is shared under the [GNU GENERAL PUBLIC LICENSE](./LICENSE.md)
+
 ## Plugin Commands
 
 1. ### `show` - shows a page in an iframe
@@ -45,7 +47,7 @@ If you already have a game you want to use - you only need to import it and expo
 ```js
 // Callback parameters to use:
 callbackPath: "gameEventCallback"
-(other values can be set as you need them)
+outputVariable: <variable>
 
 // If you specify the outputVariable it will be assigned JSON
 // with an array containing a single object, example:
@@ -74,10 +76,12 @@ Watching all 128 I/O "pins":
 ```js
 // Callback parameters to use:
 watchPath: "pico8_gpio"
-(other values can be set as you need them)
 
 // in the scripts you can use JSON.parse to get the entire array:
 JSON.parse($gameVariables( <variable> ))[0] // returns Array[number]
+
+// you can access a specific PIN this way now:
+JSON.parse($gameVariables( <variable> ))[0][ <pin_index> ]
 ```
 
 Watching a single I/O "pin":
@@ -85,10 +89,8 @@ Watching a single I/O "pin":
 // to watch a single number:
 watchPath: "pico8_gpio/0" // will watch the very first pin
 
-// other values can be set as you need them
-
 // in the scripts you can use JSON.parse to get value of that single "pin":
-JSON.parse($gameVariables( <variable> ))[0] // returns a number
+JSON.parse($gameVariables( <variable> ))[0] // returns a number stored in the pin at index 0
 ```
 
 Also it is recommended to set exported `.html` to start the game automatically:
