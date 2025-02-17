@@ -16,11 +16,13 @@ This program is shared under the [GNU GENERAL PUBLIC LICENSE](./LICENSE.md)
 ## Plugin Commands
 
 1. ### `show` - shows a page in an iframe
-   It can be called multiple times but only the first call will have effect.
    This command takes multiple [parameters documented in the code](./iframe.js).
 
 1. ### `hide` - hides the iframe
-   Takes no arguments, closes the iframe, can be called multiple times.
+   Takes no arguments, closes the iframe.
+
+*Note:* If your code calls the `show` command multiple times - only the first call will take effect.
+The next iframe can only be shown after calling the `hide` command.
 
 ## Known Issues
 At the moment in some scenarios (e.g. when the window is resized) it is possible to deliver some events to the main window. This can move the character while the
