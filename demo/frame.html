@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<link
+    rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css"
+    integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC"
+    crossorigin="anonymous">
+</head>
+<body>
+<div class="container">
+<h1>Iframe test page</h1>
+<div class="row">
+    <div class="col-6">
+        <h4>Received data:</h4>
+        <pre id="container-input"></pre>
+    </div>
+    <div class="col-6">
+        <h4>Send:</h4>
+        <textarea id="container-output" class="form-control" rows="3"></textarea>
+        <button
+            type="button"
+            class="nes-btn is-primary"
+            onclick="sendTextMessageWithPost()">
+            Send as text
+        </button>
+        <button
+            type="button"
+            class="nes-btn is-primary"
+            onclick="sendJsonMessageWithPost()">
+            Parse JSON and send as object
+        </button>
+    </div>
+</div>
+<div
+    id="container-nested"
+    class="row mt-3 p-3"
+    style="display: none; background-color: aquamarine;">
+    <div class="col-12">
+        <h3>You opened this page not in an iframe so it nested itself below.</h3>
+        <iframe style="width: 100%; height: 20em; border:1px solid steelblue"></iframe>
+    </div>
+</div>
+</div>
+<script>
+window.onmessage = function(event) {
+    console.log('Received message: ', event.data);
+    document.getElementById('container-input').innerText = JSON.stringify(event.data, null, 2);
+};
+
+let isTop = true;
+
+try {
+    if(window.parent === window) {
+        let e = document.getElementById('container-nested');
+        e.style.display = '';
+        e.querySelector('iframe').src = window.location.href;
+    } else {
+        isTop = false;
+    }
+} catch {
+    isTop = false;
+}
+
+function sendData( data ) {
+    console.log('Sending message: ', data);
+    let target = isTop ? document.querySelector('iframe').contentWindow : window.parent;
+    target.postMessage( data, '*' )
+}
+
+function sendJsonMessageWithPost() {
+    let message = JSON.parse(document.getElementById('container-output').value);
+    sendData(message);
+}
+
+function sendTextMessageWithPost() {
+    let message = document.getElementById('container-output').value;
+    sendData(message);
+}
+</script>
+</body>
+</html>
