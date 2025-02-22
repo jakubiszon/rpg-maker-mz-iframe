@@ -11,7 +11,7 @@ This plugin allows:
 |:---:|
 |![](./img/preview.gif)|
 
-This program is shared under the [GNU LESSER GENERAL PUBLIC LICENSE](./LICENSE.md)
+This program is shared under the [Mozilla Public License 2.0](./LICENSE.md)
 
 ## Plugin Commands
 
