@@ -19,6 +19,7 @@
     <div class="col-6">
         <h4>Send:</h4>
         <textarea id="container-output" class="form-control" rows="3"></textarea>
+        <div id="error-message-parsing" class="alert alert-danger" style="display: none;">The text above did not parse as JSON.</div>
         <button
             type="button"
             class="btn btn-primary btn-sm"
@@ -88,11 +89,17 @@ function sendData( data ) {
 }
 
 function sendJsonMessageWithPost() {
-    let message = JSON.parse(document.getElementById('container-output').value);
-    sendData(message);
+    try {
+        document.getElementById('error-message-parsing').style.display = 'none';
+        let message = JSON.parse(document.getElementById('container-output').value);
+        sendData(message);
+    } catch {
+        document.getElementById('error-message-parsing').style.display = '';
+    }
 }
 
 function sendTextMessageWithPost() {
+    document.getElementById('error-message-parsing').style.display = 'none';
     let message = document.getElementById('container-output').value;
     sendData(message);
 }
