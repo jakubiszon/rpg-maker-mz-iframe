@@ -2,6 +2,7 @@
 // RPG Maker MZ - iframe plugin
 // 
 // This plugin is licensed under Mozilla Public License 2.0
+// The license allows you to use the plugin in any product, also commercial.
 // https://www.mozilla.org/en-US/MPL/2.0/
 //=============================================================================
 
@@ -16,6 +17,14 @@
  * @desc Makes the plugin print debug information to the console.
  * @default false
  *
+ * @param useSimpleValues
+ * @text useSimpleValues
+ * @type boolean
+ * @default false
+ * @desc Makes the plugin pass a single value to the callback instead of an array.
+ *       This will only work when the callback receives a single param.
+ *       If multiple params are received - they will be passed as an array.
+ * 
  * @help iframe.js
  *
  * This plugin allows showing other web-pages in an iframe over the game.
@@ -24,15 +33,10 @@
  * To know when to close the page - the plugin can setup a callback or
  * watch for updates in iframe data.
  *
- * TODO (PRs welcome! https://github.com)
- * 1. Watching data is not yet implemented
- * 2. Calling "show" when a page is already shown (hide old iframe, create new iframe)
- *    The current workaround would be to call "hide" and "show" commands one after another
- * 3. Nested paths for callbackPath param
- * 4. Nested paths for watchPath param
- * 5. Calling "hide" command multiple times needs to be checked for stability
- * 6. Add width and height params to allow setting custom iframe size
- * 7. Add zIndex param
+ * TODO (PRs welcome! https://github.com/jakubiszon/rpg-maker-mz-iframe)
+ * 1. Nested paths for callbackPath param
+ * 2. Add width and height params to allow setting custom iframe size
+ * 3. Add zIndex param
  *
  * @command show
  * @text show
@@ -84,22 +88,49 @@
  * @desc Removes the current iframe if it was set-up or does nothing.
  */
 
+/** @class SystemData stores data about enabled parts of the $gameSystem. */
+class systemData {
+	isMenuEnabled = false;
+	isSaveEnabled = false;
+}
+
+class iframeData {
+	/**
+	 * Stores data about enabled parts of the $gameSystem.
+	 * @type { systemData | null }
+	 */
+	systemData = new systemData();
+
+	/** Stores the value returned from window.setInterval, only used when watchPath is defined. */
+	watchIntervalId = null;
+}
+
 (function() {
 	const pluginName = 'iframe';
 	const containerId = `${pluginName}-container`;
-	const pluginParameters = PluginManager.parameters('iframe');
+	const pluginParameters = getParameters();
+	logDebugInfo( `plugin ${pluginName} assigned parameters: `, pluginParameters );
 
 	/** @constant {number} zIndex used for the iframe shown by this plugin. */
-	const zIndex = 4;
-	
-	/** stores values to restore after the iframe is hidden */
-	let systemData = null;
+	const zIndex = 10;
 
-	/** stores values used in the watch handler */
-	let watchParams = null;
+	/** stores data needed in any callback after creation of the iframe */
+	let currentIframeData = {};
 
 	PluginManager.registerCommand( pluginName, "hide", hidePage );
 	PluginManager.registerCommand( pluginName, "show", showPage );
+
+	/**
+	 * Returns plugin parameters with boolean values converted to actual booleans.
+	 */
+	function getParameters(){
+		let tmpParameters = PluginManager.parameters( 'iframe' );
+		return {
+			...tmpParameters,
+			debugMode: tmpParameters.debugMode === 'true',
+			useSimpleValues: tmpParameters.useSimpleValues === 'true'
+		};
+	}
 
 	function showPage ( args ) {
 		logDebugInfo( 'show command', args );
@@ -114,35 +145,30 @@
 			return;
 		}
 
-		if( document.getElementById( containerId )) {
-			// the iframe is already created, we only change the URL
-		} else {
-			// no iframe created yet
+		// no iframe created yet
+		currentIframeData.args = args;
+		disableMenuAndSave();
 
-			disableMenuAndSave();
+		let iframe = createIframe( pageUrl );
+		let container = createContainer();
+		container.appendChild( iframe );
+		document.body.insertAdjacentElement( 'beforeend', container );
 
-			let iframe = createIframe( pageUrl );
-			let container = createContainer();
-			container.appendChild( iframe );
-			document.body.insertAdjacentElement( 'beforeend', container );
+		updateScale();
+		window.addEventListener( "resize", updateScale );
+		window.addEventListener( "focus", focusOnIframe );
+		window.addEventListener( "message", iframeCallback );
 
-			updateScale();
-			window.addEventListener( "resize", updateScale );
-
-			iframe.onload = function() {
-				iframe.focus();
-				
-				if( !!args.callbackPath ) {
-					iframe.contentWindow[ args.callbackPath ] = iframeCallback.bind( args );
-				}
-				
-				if( !!args.watchPath ) {
-					const intervalId = window.setInterval( watchCallback.bind( args ), 166 );
-					logDebugInfo( 'setting up watch callback as timeout: ' + intervalId );
-					watchParams = {
-						intervalId,
-					}
-				}
+		iframe.onload = function() {
+			iframe.focus();
+			
+			if( !!args.callbackPath ) {
+				iframe.contentWindow[ args.callbackPath ] = iframeCallback;
+			}
+			
+			if( !!args.watchPath ) {
+				currentIframeData.watchIntervalId = window.setInterval( watchCallback, 166 );
+				logDebugInfo( 'setting up watch callback as timeout: ' + currentIframeData.watchIntervalId );
 			}
 		}
 	}
@@ -156,12 +182,18 @@
 		restoreMenuAndSave()
 
 		let containerElement = document.getElementById( containerId );
-		if( containerElement ) containerElement.parentElement.removeChild( containerElement );
+		if( !containerElement ) return;
+		
+		containerElement.parentElement.removeChild( containerElement );
 
-		if( watchParams?.intervalId ) window.clearInterval( watchParams.intervalId );
-		watchParams = null;
+		if( currentIframeData.watchIntervalId ) window.clearInterval( currentIframeData.watchIntervalId );
+
+		// reset iframe data
+		currentIframeData = {};
 
 		window.removeEventListener( "resize", updateScale );
+		window.removeEventListener( "focus", focusOnIframe );
+		window.removeEventListener( "message", iframeCallback );
 		window.focus();
 	}
 
@@ -176,6 +208,7 @@
 		iframe.style.width = '800px';
 		iframe.style.transformOrigin = 'center';
 		iframe.style.borderStyle = 'none';
+		iframe.style.overflow = 'hidden';
 		iframe.src = pageUrl;
 		return iframe;
 	}
@@ -225,13 +258,20 @@
 		});
 	}
 
+	/**
+	 * Sets the focus on the iframe window.
+	 */
+	function focusOnIframe() {
+		document.getElementById( containerId ).querySelector( 'iframe' ).focus();
+	}
+
 	function disableMenuAndSave() {
-		systemData = {
+		currentIframeData.systemData = {
 			isSaveEnabled: $gameSystem.isSaveEnabled(),
 			isMenuEnabled: $gameSystem.isMenuEnabled(),
 		}
 
-		logDebugInfo( 'storing feature enablement data', systemData );
+		logDebugInfo( 'storing feature enablement data', currentIframeData.systemData );
 		
 		$gameSystem.disableSave();
 		$gameSystem.disableMenu();
@@ -241,10 +281,10 @@
 	 * Restores menu and save enablement statuses which were recorded when setting up the iframe.
 	 */
 	function restoreMenuAndSave() {
-		if( systemData?.isSaveEnabled ) $gameSystem.enableSave();
-		if( systemData?.isMenuEnabled ) $gameSystem.enableMenu();
+		if( currentIframeData.systemData?.isSaveEnabled ) $gameSystem.enableSave();
+		if( currentIframeData.systemData?.isMenuEnabled ) $gameSystem.enableMenu();
 
-		systemData = null;
+		currentIframeData.systemData = null;
 	}
 	
 	/**
@@ -254,15 +294,18 @@
 	function iframeCallback() {
 		logDebugInfo( 'callback called', arguments );
 
-		if( !!this.outputVariable ) {
-			let varialeString = JSON.stringify( arguments );
-			logDebugInfo( `callback - setting variable ${this.outputVariable} as ${varialeString}.` );
-			$gameVariables.setValue(this.outputVariable, JSON.stringify(arguments));
+		if( !!currentIframeData.args.outputVariable ) {
+			let varialeString = (pluginParameters.useSimpleValues && arguments.length === 1) ?
+				JSON.stringify( arguments[0] ) :
+				JSON.stringify( arguments );
+
+			logDebugInfo( `callback - setting variable ${currentIframeData.args.outputVariable} as ${varialeString}.` );
+			$gameVariables.setValue(currentIframeData.args.outputVariable, JSON.stringify(arguments));
 		}
 
-		if( !!this.commonEvent ) {
-			logDebugInfo( 'callback - calling event ' + this.commonEvent );
-			$gameTemp.reserveCommonEvent( parseInt( this.commonEvent ));
+		if( !!currentIframeData.args.commonEvent ) {
+			logDebugInfo( 'callback - calling event ' + currentIframeData.args.commonEvent );
+			$gameTemp.reserveCommonEvent( parseInt( currentIframeData.args.commonEvent ));
 		} else {
 			logDebugInfo( 'callback - closing page ' );
 			hidePage();
@@ -277,23 +320,23 @@
 		const container = document.getElementById( containerId );
 		if( !container ) return;
 
-		let parts = this.watchPath.split('/').filter(part => !!part);
+		let parts = currentIframeData.args.watchPath.split('/').filter(part => !!part);
 		let variable = container.querySelector( 'iframe' ).contentWindow;
 		for( const part of parts ) {
 			if( variable == null ) break;
 			variable = variable[ part ];
 		}
 
-		if( !Object.prototype.hasOwnProperty.call( watchParams, 'value' )) {
+		if( !Object.prototype.hasOwnProperty.call( currentIframeData, 'watchValue' )) {
 			logDebugInfo( 'watch - first assignment' );
-			watchParams.value = variable;
+			currentIframeData.watchValue = variable;
 			return;
 		}
 
-		if( JSON.stringify(variable) != JSON.stringify(watchParams.value )) {
+		if( JSON.stringify(variable) != JSON.stringify( currentIframeData.watchValue )) {
 			logDebugInfo( 'watch - detected change' );
-			iframeCallback.call( this, variable );
-			watchParams.value = variable;
+			iframeCallback( variable );
+			currentIframeData.watchValue = variable;
 		}
 	}
 	
